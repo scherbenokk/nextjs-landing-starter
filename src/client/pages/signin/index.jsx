@@ -6,6 +6,7 @@ import Button from '~/components/button';
 import Form, { Wrap } from '~/components/form';
 import Input from '~/components/input';
 import SignUpGoogle from '~/components/signup-google';
+import TwoFaModal from '~/components/two-fa-modal';
 
 import Layout from '~/layouts/main';
 import Auth from '~/layouts/auth';
@@ -28,26 +29,47 @@ export default class Signin extends PureComponent {
       password: '',
       isLoading: false,
       error: null,
+      isTwoFaEnabled: false,
     };
-
-    this.submitSigninAsync = this.submitSignin.bind(this);
   }
 
-  async submitSignin(event) {
+  submitTwoFa = async (twoFaCode) => {
+    const { password, email } = this.state;
+    const { redirectUrl } = await signin({
+      email,
+      password,
+      twoFaCode,
+    });
+
+    window.location.href = redirectUrl;
+  }
+
+  submitSignin = async (event) => {
     event.preventDefault();
 
     try {
       this.setState({ isLoading: true });
 
-      const { email, password } = this.state;
-      const { redirectUrl } = await signin({ email, password });
+      const { password, email } = this.state;
+      const res = await signin({
+        email,
+        password,
+      });
 
-      window.location.href = redirectUrl;
+      if (res.shouldCompleteTwoFa) {
+        this.setState({ isTwoFaEnabled: true });
+      } else {
+        window.location.href = res.redirectUrl;
+      }
     } catch (error) {
       this.setState({ error });
     } finally {
       this.setState({ isLoading: false });
     }
+  }
+
+  onModalClose = () => {
+    this.setState({ isTwoFaEnabled: false });
   }
 
   render() {
@@ -56,6 +78,7 @@ export default class Signin extends PureComponent {
       password,
       error,
       isLoading,
+      isTwoFaEnabled,
     } = this.state;
 
     return (
@@ -67,7 +90,7 @@ export default class Signin extends PureComponent {
             <Wrap>
               <h2 className={styles.title}>Welcome Back!</h2>
 
-              <Form onSubmit={this.submitSigninAsync}>
+              <Form onSubmit={this.submitSignin}>
                 <Input
                   key="email"
                   value={email}
@@ -84,6 +107,15 @@ export default class Signin extends PureComponent {
                   placeholder="Password"
                   type="password"
                 />
+
+                { isTwoFaEnabled && (
+                  <TwoFaModal
+                    onClose={this.onModalClose}
+                    onSubmit={this.submitTwoFa}
+                    isShown={isTwoFaEnabled}
+                  />
+                )}
+
 
                 <Error error={error} />
 
